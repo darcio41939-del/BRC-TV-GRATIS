@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv>
+  <channel id="sample1">
+    <display-name>Sample XML Channel 1</display-name>
+    <icon src="https://via.placeholder.com/120x60.png?text=XML1"/>
+  </channel>
+  <channel id="sample2">
+    <display-name>Sample XML Channel 2</display-name>
+    <icon src="https://via.placeholder.com/120x60.png?text=XML2"/>
+  </channel>
+</tv>

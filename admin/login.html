@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin — BRC TV GRÁTIS</title>
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div style="max-width:420px;margin:60px auto;background:#071225;padding:20px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);">
+    <h2>Login - Administrador</h2>
+    <form id="loginForm">
+      <label>Usuário<br><input id="user" required value=""></label><br><br>
+      <label>Senha<br><input id="pass" type="password" required value=""></label><br><br>
+      <button type="submit">Entrar</button>
+    </form>
+    <div style="margin-top:12px;color:var(--muted)">Use as credenciais do administrador.</div>
+  </div>
+<script>
+const FORM = document.getElementById('loginForm');
+FORM.addEventListener('submit', (e)=>{e.preventDefault();
+  const u = document.getElementById('user').value;
+  const p = document.getElementById('pass').value;
+  // Client-side auth (NOT secure) as requested
+  if(u === 'darcio' && p === '08242979'){
+    localStorage.setItem('brc_admin_auth','1');
+    window.location.href = 'upload.html';
+  } else {
+    alert('Credenciais inválidas');
+  }
+});
+</script>
+</body>
+</html>

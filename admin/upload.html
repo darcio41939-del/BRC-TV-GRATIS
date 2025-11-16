@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Upload — Admin</title>
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div style="max-width:900px;margin:20px auto;">
+    <h2>Importar listas de canais</h2>
+    <div style="background:var(--panel);padding:12px;border-radius:8px;">
+      <p>Você pode subir arquivos: <strong>.xml</strong> (XMLTV), <strong>.m3u</strong> (listas), <strong>.json</strong> (formato simples), <strong>.mp4</strong> (arquivo único como canal).</p>
+      <input id="file" type="file" multiple>
+      <button id="btnParse">Importar selecionados</button>
+      <button id="btnLogout" style="margin-left:12px">Logout</button>
+      <div id="out" style="margin-top:8px;color:var(--muted)"></div>
+    </div>
+
+    <h3 style="margin-top:12px">Preview canais</h3>
+    <div id="preview" style="background:var(--panel);padding:12px;border-radius:8px;min-height:120px"></div>
+  </div>
+
+<script>
+// simple client-side parser for XMLTV, M3U and JSON
+document.getElementById('btnLogout').addEventListener('click', ()=>{ localStorage.removeItem('brc_admin_auth'); window.location.href='../index.html'; });
+
+const input = document.getElementById('file');
+const out = document.getElementById('out');
+const preview = document.getElementById('preview');
+
+function parseM3U(text, filename){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const items = [];
+  let lastTitle = null;
+  for(const line of lines){
+    if(line.startsWith('#EXTINF')){
+      const parts = line.split(',');
+      lastTitle = parts.slice(1).join(',').trim();
+    } else if(!line.startsWith('#')){
+      const url = line;
+      const id = filename + '::' + url;
+      items.push({id, title: lastTitle || url, folder: filename, icon:'', url, type:'stream'});
+      lastTitle = null;
+    }
+  }
+  return items;
+}
+
+function parseXMLTV(text, filename){
+  try{
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'application/xml');
+    const chNodes = Array.from(doc.querySelectorAll('channel'));
+    const items = chNodes.map(n=>{
+      const id = n.getAttribute('id') || ('xml::'+Math.random().toString(36).slice(2,9));
+      const display = n.querySelector('display-name') ? n.querySelector('display-name').textContent.trim() : id;
+      const iconEl = n.querySelector('icon');
+      const icon = iconEl ? iconEl.getAttribute('src') : '';
+      return {id: filename+'::'+id, title:display, folder: filename, icon, url:'', type:'xmltv'};
+    });
+    return items;
+  }catch(e){ return []; }
+}
+
+function parseJSON(text, filename){
+  try{
+    const j = JSON.parse(text);
+    if(Array.isArray(j)){
+      return j.map((it,idx)=>({id: filename+'::'+(it.id||idx), title: it.title||it.name||('canal-'+idx), folder: filename, icon:it.icon||'', url:it.url||'', type: it.type||'stream'}));
+    }
+    return [];
+  }catch(e){ return []; }
+}
+
+function parseFile(f){
+  return new Promise((res, rej)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const txt = e.target.result;
+      const name = f.name.replace(/\s+/g,'_');
+      if(name.toLowerCase().endsWith('.m3u') || name.toLowerCase().endsWith('.m3u8')){
+        res(parseM3U(txt, name));
+      } else if(name.toLowerCase().endsWith('.xml')){
+        res(parseXMLTV(txt, name));
+      } else if(name.toLowerCase().endsWith('.json')){
+        res(parseJSON(txt, name));
+      } else if(name.toLowerCase().endsWith('.mp4') || name.toLowerCase().endsWith('.webm') || name.toLowerCase().endsWith('.ogg')){
+        // single file as channel
+        const id = name + '::' + Math.random().toString(36).slice(2,8);
+        res([{id, title:name, folder: 'Uploads', icon:'', url: URL.createObjectURL(f), type:'mp4'}]);
+      } else {
+        res([]);
+      }
+    };
+    reader.onerror = ()=> rej('read error');
+    reader.readAsText(f);
+  });
+}
+
+document.getElementById('btnParse').addEventListener('click', async ()=>{
+  if(!localStorage.getItem('brc_admin_auth')) return window.location.href='login.html';
+  const files = input.files;
+  if(!files.length) return alert('Selecione arquivos');
+  out.textContent = 'Processando...';
+  const imported = [];
+  for(const f of files){
+    try{
+      const items = await parseFile(f);
+      imported.push(...items);
+    }catch(e){ console.error(e); }
+  }
+  // handoff to app
+  if(imported.length) {
+    window.opener = window.opener || window; // in case opened directly
+    // push to localStorage by using the same API as app expects
+    const existingRaw = localStorage.getItem('brc_tv_channels_v1');
+    let existing = [];
+    if(existingRaw){ try{ existing = JSON.parse(existingRaw);}catch(e){} }
+    const map = new Map(existing.map(c=>[c.id,c]));
+    imported.forEach(i=> map.set(i.id,i));
+    const merged = Array.from(map.values());
+    localStorage.setItem('brc_tv_channels_v1', JSON.stringify(merged));
+    preview.innerHTML = '<pre>'+JSON.stringify(imported.slice(0,40), null, 2)+'</pre>';
+    out.textContent = 'Importação concluída: ' + imported.length + ' canais.';
+  } else {
+    out.textContent = 'Nenhum canal processado dos arquivos enviados.';
+  }
+});
+</script>
+</body>
+</html>
